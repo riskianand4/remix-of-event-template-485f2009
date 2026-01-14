@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Asset } from '@/types/assets';
+import { Asset, getLocationString } from '@/types/assets';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,8 @@ export const AssetTable: React.FC<AssetTableProps> = ({
 
   // Filter assets based on search and filters
   const filteredAssets = assets.filter(asset => {
-    const matchesSearch = asset.name.toLowerCase().includes(searchTerm.toLowerCase()) || asset.code.toLowerCase().includes(searchTerm.toLowerCase()) || asset.category.toLowerCase().includes(searchTerm.toLowerCase()) || asset.location.toLowerCase().includes(searchTerm.toLowerCase()) || asset.picName && asset.picName.toLowerCase().includes(searchTerm.toLowerCase());
+    const locationStr = getLocationString(asset.location);
+    const matchesSearch = asset.name.toLowerCase().includes(searchTerm.toLowerCase()) || asset.code.toLowerCase().includes(searchTerm.toLowerCase()) || asset.category.toLowerCase().includes(searchTerm.toLowerCase()) || locationStr.toLowerCase().includes(searchTerm.toLowerCase()) || asset.picName && asset.picName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
     const matchesCategory = categoryFilter === 'all' || asset.category === categoryFilter;
     return matchesSearch && matchesStatus && matchesCategory;
@@ -99,7 +100,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({
       'Status': asset.status,
       'Kondisi': asset.condition,
       'PIC': asset.picName || '',
-      'Lokasi': asset.location,
+      'Lokasi': getLocationString(asset.location),
       'Harga Beli': asset.purchasePrice,
       'Tanggal Beli': asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('id-ID') : '',
       'Deskripsi': asset.description || '',
@@ -249,7 +250,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({
                         {asset.picName ? <span className="text-xs truncate block" title={asset.picName}>{asset.picName}</span> : <span className="text-xs text-muted-foreground">-</span>}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground w-[100px]">
-                        <div className="truncate" title={asset.location}>{asset.location}</div>
+                        <div className="truncate" title={getLocationString(asset.location)}>{getLocationString(asset.location)}</div>
                       </TableCell>
                       <TableCell className="w-[100px]">
                         <div className="text-xs truncate">
@@ -366,7 +367,7 @@ export const AssetTable: React.FC<AssetTableProps> = ({
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Lokasi</label>
-                      <p className="text-sm bg-background rounded px-2 py-1 border">{selectedAsset.location}</p>
+                      <p className="text-sm bg-background rounded px-2 py-1 border">{getLocationString(selectedAsset.location)}</p>
                     </div>
                   </div>
                 </div>

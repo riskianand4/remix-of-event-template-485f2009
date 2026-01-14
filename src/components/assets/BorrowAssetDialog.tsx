@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Asset, AssetBorrowRequest } from '@/types/assets';
+import { Asset, AssetBorrowRequest, getLocationString } from '@/types/assets';
 import { User } from '@/types/users';
 import {
   Dialog,
@@ -161,7 +161,7 @@ export const BorrowAssetDialog: React.FC<BorrowAssetDialogProps> = ({
           </div>
           <div className="flex justify-between">
             <span className="text-sm text-muted-foreground">Lokasi:</span>
-            <span className="text-sm">{asset.location}</span>
+            <span className="text-sm">{getLocationString(asset.location)}</span>
           </div>
         </div>
 

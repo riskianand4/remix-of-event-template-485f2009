@@ -1,56 +1,6 @@
 import { apiClient } from '@/services/apiClient';
 import { safeApiCall } from '@/services/apiResponseHandler';
-
-export interface Asset {
-  id: string;
-  name: string;
-  assetCode: string;
-  category: string;
-  description?: string;
-  purchasePrice: number;
-  currentValue?: number;
-  purchaseDate: Date | string;
-  warrantyExpiry?: Date;
-  location?: {
-    department?: string;
-    room?: string;
-    building?: string;
-  };
-  assignedTo?: {
-    user?: string;
-    assignedDate?: Date;
-    returnDate?: Date;
-  };
-  condition: 'excellent' | 'good' | 'fair' | 'poor' | 'damaged';
-  status: 'available' | 'in_use' | 'maintenance' | 'retired' | 'lost' | 'stolen';
-  maintenanceSchedule?: {
-    frequency: 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'none';
-    lastMaintenance?: Date;
-    nextMaintenance?: Date;
-  };
-  specifications?: {
-    brand?: string;
-    model?: string;
-    serialNumber?: string;
-    specifications?: Record<string, string>;
-  };
-  images?: Array<{
-    url: string;
-    alt?: string;
-    uploadDate?: Date;
-  }>;
-  documents?: Array<{
-    name: string;
-    url: string;
-    type: 'manual' | 'warranty' | 'invoice' | 'certificate' | 'other';
-    uploadDate?: Date;
-  }>;
-  tags?: string[];
-  createdBy: string;
-  updatedBy?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { Asset } from '@/types/assets';
 
 export interface AssetFilters {
   page?: number;
