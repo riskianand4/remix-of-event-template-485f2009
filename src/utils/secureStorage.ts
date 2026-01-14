@@ -105,6 +105,10 @@ class SecureStorageManager {
       localStorage.setItem(this.TOKEN_KEY, encryptedData);
       localStorage.setItem(this.DEVICE_KEY, JSON.stringify(fingerprint));
       
+      // CRITICAL: Store plain token for reliable session persistence across reloads
+      // This is the primary token that useAuthManager checks on initialization
+      localStorage.setItem('auth-token', token);
+      
       // Store user data (less sensitive, but still important)
       localStorage.setItem('user', JSON.stringify(user));
       localStorage.setItem('lastLoginTime', Date.now().toString());
@@ -113,7 +117,18 @@ class SecureStorageManager {
       return true;
     } catch (error) {
       this.logger.error('Failed to store secure token', error);
-      return false;
+      
+      // Fallback: At minimum, store plain token and user for basic session persistence
+      try {
+        localStorage.setItem('auth-token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem('lastLoginTime', Date.now().toString());
+        this.logger.info('Stored token using fallback method');
+        return true;
+      } catch (fallbackError) {
+        this.logger.error('Fallback storage also failed', fallbackError);
+        return false;
+      }
     }
   }
 
