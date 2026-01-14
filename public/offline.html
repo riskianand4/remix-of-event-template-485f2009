@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Offline - Inventory Management</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        
+        .container {
+            max-width: 500px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.8;
+        }
+        
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        
+        p {
+            margin: 0 0 30px 0;
+            font-size: 16px;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+        
+        .retry-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .retry-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .features {
+            margin-top: 40px;
+            text-align: left;
+        }
+        
+        .feature {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            opacity: 0.8;
+        }
+        
+        .feature-icon {
+            margin-right: 12px;
+        }
+        
+        .status {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                margin: 0 10px;
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .icon {
+                font-size: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📱</div>
+        <h1>Aplikasi Sedang Offline</h1>
+        <p>Koneksi internet Anda terputus. Beberapa fitur mungkin tidak tersedia saat ini.</p>
+        
+        <button class="retry-btn" onclick="checkConnection()">
+            🔄 Coba Lagi
+        </button>
+        
+        <div class="features">
+            <div class="feature">
+                <span class="feature-icon">✅</span>
+                <span>Data yang sudah dimuat tetap tersedia</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">💾</span>
+                <span>Perubahan akan disimpan secara lokal</span>
+            </div>
+            <div class="feature">
+                <span class="feature-icon">🔄</span>
+                <span>Sinkronisasi otomatis saat online kembali</span>
+            </div>
+        </div>
+        
+        <div class="status" id="status">
+            Status: Mencoba menghubungkan kembali...
+        </div>
+    </div>
+
+    <script>
+        let retryCount = 0;
+        const maxRetries = 10;
+        
+        function checkConnection() {
+            const status = document.getElementById('status');
+            status.textContent = 'Status: Memeriksa koneksi...';
+            
+            fetch('/api/health', { 
+                method: 'HEAD',
+                cache: 'no-cache'
+            })
+            .then(response => {
+                if (response.ok) {
+                    status.textContent = 'Status: Koneksi berhasil! Memuat ulang...';
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    throw new Error('Server tidak merespons');
+                }
+            })
+            .catch(error => {
+                retryCount++;
+                if (retryCount < maxRetries) {
+                    status.textContent = `Status: Gagal terhubung. Mencoba lagi dalam 5 detik... (${retryCount}/${maxRetries})`;
+                    setTimeout(checkConnection, 5000);
+                } else {
+                    status.textContent = 'Status: Tidak dapat terhubung. Periksa koneksi internet Anda.';
+                    retryCount = 0;
+                }
+            });
+        }
+        
+        // Auto-retry every 30 seconds
+        setInterval(() => {
+            if (retryCount === 0) {
+                checkConnection();
+            }
+        }, 30000);
+        
+        // Check online/offline status
+        window.addEventListener('online', () => {
+            document.getElementById('status').textContent = 'Status: Koneksi kembali! Memuat ulang...';
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        });
+        
+        window.addEventListener('offline', () => {
+            document.getElementById('status').textContent = 'Status: Koneksi terputus';
+        });
+        
+        // Initial connection check
+        setTimeout(checkConnection, 2000);
+    </script>
+</body>
+</html>
