@@ -72,8 +72,8 @@ export const SECURITY_HEADERS = {
 export const validateProductionEnvironment = (): string[] => {
   const errors: string[] = [];
   
-  // Check critical environment variables
-  const requiredEnvVars = ['NODE_ENV', 'VITE_API_BASE_URL'];
+  // Check critical environment variables (only VITE_ prefixed vars are exposed in Vite)
+  const requiredEnvVars = ['VITE_API_BASE_URL'];
   
   requiredEnvVars.forEach(envVar => {
     if (!import.meta.env[envVar]) {

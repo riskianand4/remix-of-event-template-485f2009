@@ -1,5 +1,5 @@
 import React from 'react';
-import { Asset } from '@/types/assets';
+import { Asset, getLocationString } from '@/types/assets';
 import {
   Dialog,
   DialogContent,
@@ -183,7 +183,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
                       <MapPin className="w-4 h-4 text-muted-foreground" />
                       <div>
                         <label className="text-sm font-medium text-muted-foreground">Lokasi</label>
-                        <p>{asset.location}</p>
+                        <p>{getLocationString(asset.location)}</p>
                       </div>
                     </div>
                     

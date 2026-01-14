@@ -1,6 +1,6 @@
 import { apiClient } from './apiClient';
 import { Asset } from '@/types/assets';
-import { handleApiResponse, safeApiCall } from './apiResponseHandler';
+import { safeApiCall } from './apiResponseHandler';
 
 // Data mapper to convert backend data to frontend format
 const mapBackendAssetToFrontend = (backendAsset: any): Asset => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Asset } from '@/types/assets';
+import { Asset, getLocationString } from '@/types/assets';
 import {
   Dialog,
   DialogContent,
@@ -104,7 +104,7 @@ export const EditAssetDialog: React.FC<EditAssetDialogProps> = ({
         description: asset.description || '',
         condition: asset.condition,
         status: asset.status,
-        location: asset.location,
+        location: getLocationString(asset.location),
         purchasePrice: asset.purchasePrice,
       });
       setErrors({});
