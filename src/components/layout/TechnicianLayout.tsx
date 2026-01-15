@@ -1,27 +1,30 @@
 import React from 'react';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { TechnicianSidebar } from './TechnicianSidebar';
 import { TechnicianMobileBottomNav } from './TechnicianMobileBottomNav';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Wrench, LogOut } from 'lucide-react';
+import { PSBNotificationCenter } from '@/components/technician/PSBNotificationCenter';
+
 interface TechnicianLayoutProps {
   children: React.ReactNode;
 }
+
 export function TechnicianLayout({
   children
 }: TechnicianLayoutProps) {
-  const handleLogout = () => {
-    window.location.href = '/';
-  };
-  return <SidebarProvider>
-      <div className="flex min-h- w-[2000px]">
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full">
         <TechnicianSidebar />
-        <main className="flex-1 bg-muted/5 pb-16 md:pb-0 sm:ml-60   ">
+        <main className="flex-1 bg-muted/5 pb-16 md:pb-0 sm:ml-60">
+          {/* Header with notification */}
+          <div className="sticky top-0 z-40 flex items-center justify-end gap-2 p-2 bg-background/80 backdrop-blur-sm border-b md:hidden">
+            <PSBNotificationCenter />
+          </div>
           {children}
         </main>
       </div>
       {/* Mobile Bottom Navigation */}
       <TechnicianMobileBottomNav />
-    </SidebarProvider>;
+    </SidebarProvider>
+  );
 }
