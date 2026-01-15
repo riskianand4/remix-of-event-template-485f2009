@@ -183,11 +183,59 @@ export default function TechnicianSignatureReport() {
       return;
     }
 
+    // Validate SN ONT is filled
+    if (!formData.ontSerial || formData.ontSerial.trim() === '') {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'SN ONT harus diisi sebelum generate PDF'
+      });
+      return;
+    }
+
     try {
       setGenerating(true);
       
+      // CRITICAL FIX: Create activation object with current form data
+      // This ensures the PDF uses the latest data from the form, not stale data from server
+      const activationWithFormData: PSBActivation = {
+        ...activation,
+        installationReport: {
+          ...activation.installationReport,
+          speedTest: {
+            download: parseFloat(formData.downloadSpeed) || undefined,
+            upload: parseFloat(formData.uploadSpeed) || undefined,
+            ping: parseFloat(formData.ping) || undefined
+          },
+          device: {
+            ontType: formData.ontType || undefined,
+            ontSerial: formData.ontSerial || undefined, // Use form data directly
+            routerType: formData.routerType || undefined,
+            routerSerial: formData.routerSerial || undefined,
+            stbId: formData.stbId || undefined
+          },
+          datek: {
+            area: formData.area || undefined,
+            odc: formData.odc || undefined,
+            odp: formData.odp || undefined,
+            port: formData.port || undefined,
+            dc: formData.dc || undefined,
+            soc: formData.soc || undefined
+          },
+          serviceType: (formData.serviceType as 'pasang_baru' | 'cabut' | 'upgrade' | 'downgrade' | 'pda') || undefined,
+          packageSpeed: formData.packageSpeed ? parseInt(formData.packageSpeed) as (20 | 30 | 40 | 50 | 100) : undefined,
+          fastelNumber: formData.fastelNumber || undefined,
+          contactPerson: formData.contactPerson || undefined,
+          signatures: {
+            technician: technicianSignature,
+            customer: customerSignature,
+            signedAt: new Date().toISOString()
+          }
+        }
+      };
+      
       await generateInstallationReportPDF(
-        activation,
+        activationWithFormData,
         technicianSignature,
         customerSignature
       );
@@ -195,7 +243,7 @@ export default function TechnicianSignatureReport() {
       // Update status to report generated
       await psbActivationApi.updateActivation(id!, {
         installationReport: {
-          ...activation.installationReport,
+          ...activationWithFormData.installationReport,
           reportGenerated: true,
           reportGeneratedAt: new Date().toISOString()
         }
