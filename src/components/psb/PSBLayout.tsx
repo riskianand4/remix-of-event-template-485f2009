@@ -26,7 +26,7 @@ export const PSBLayout: React.FC = () => {
       </div>;
   }
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
   const getRoleBadgeColor = (role: string) => {
     switch (role) {

@@ -133,7 +133,7 @@ const ModernLoginPage = () => {
 
               {/* Text */}
               <h1 className="text-sm md:text-md lg:text-xl font-bold text-foreground">
-                Telnet <span className="text-primary">Inventory</span>
+                Telnet <span className="text-primary">PSBLink</span>
               </h1>
             </motion.div>
 
@@ -152,7 +152,7 @@ const ModernLoginPage = () => {
                 delay: 0.3,
               }}
             >
-              Sistem Manajemen Stok Barang Modern dengan Teknologi Terdepan
+              Sistem Manajemen PSB & Gangguan Telnet Indonesia
             </motion.p>
           </div>
 
