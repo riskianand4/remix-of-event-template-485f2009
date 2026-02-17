@@ -1,212 +1,119 @@
 
-
-# Rencana: Hapus Inventory, Rename ke Telnet PSBLink
+# Rencana: Migrasi PDF Generation ke Backend (Puppeteer)
 
 ## Ringkasan
-Menghapus semua fitur inventory/produk/stok/aset dari aplikasi, menyisakan hanya fitur PSB dan Gangguan (Interruption). Rename aplikasi menjadi "Telnet PSBLink". Login langsung redirect ke halaman PSB.
+Menghapus generate PDF di sisi client (jsPDF + html2canvas) dan memindahkan ke backend menggunakan Puppeteer. Membuat template HTML Berita Acara yang lebih rapi dan profesional.
 
-## Daftar Perubahan
+## Perubahan yang Dilakukan
 
-### 1. Rename Aplikasi
-- **`index.html`** - Ubah title menjadi "Telnet PSBLink"
-- **`src/components/auth/ModernLoginPage.tsx`** - Ubah branding dari "Telnet Inventory" ke "Telnet PSBLink", ubah deskripsi
-- **`src/components/psb/PSBSidebar.tsx`** - Ubah label "Report PSB" ke "Telnet PSBLink", hapus tombol "Kembali ke Inventori"
-- **`src/components/layout/WelcomeSection.tsx`** - Ubah deskripsi welcome dari inventori ke PSB
+### 1. Backend - Tambah Route Generate PDF
+Buat file baru `backend/routes/generatePdf.js` yang:
+- Endpoint: `POST /api/psb-activations/:id/generate-pdf`
+- Mengambil data activation dari database berdasarkan ID
+- Juga menerima data tambahan dari request body (formData seperti ontSerial, signatures, dll) untuk override data yang mungkin belum tersimpan
+- Render HTML template profesional menggunakan Puppeteer
+- Return PDF sebagai response binary (`application/pdf`)
 
-### 2. Ubah Routing - Login Langsung ke PSB
-- **`src/App.tsx`** - Hapus semua route inventory (/, /products, /inventory, /aset, /orders, /alerts, /stock-movement, /stock-report, /database, /api-management, /settings, /audit-log, /security, /more, /supervisor). Route "/" langsung ke PSBLayout.
-- **`src/pages/Index.tsx`** - Ubah agar redirect semua user ke /psb-report setelah login
-- **`src/components/auth/ModernLoginPage.tsx`** - Navigate ke "/" yang sekarang adalah PSB
+### 2. Backend - Template HTML Berita Acara (Rapi & Profesional)
+Template yang akan di-render oleh Puppeteer:
+- Font: Times New Roman (sesuai template saat ini)
+- Layout A4 dengan margin yang tepat
+- Logo TelNet Fiber di header
+- Semua field terisi rapi: Layanan (checkbox), Jenis Layanan, Paket, Speed Test, Data Pelanggan, DATEK (tabel), Device (ONT, Router, STB), Disclaimer, Tanda Tangan
+- Tidak ada field kosong/placeholder yang jelek - field kosong ditampilkan dengan garis bawah rapi
+- Signature sebagai image base64
 
-### 3. Hapus File Pages Inventory (17 file)
-- `src/pages/AIStudioPage.tsx`
-- `src/pages/AlertsPage.tsx`
-- `src/pages/ApiManagementPage.tsx`
-- `src/pages/AssetsPage.tsx`
-- `src/pages/AuditLogPage.tsx`
-- `src/pages/DatabasePage.tsx`
-- `src/pages/DocumentationPage.tsx`
-- `src/pages/InventoryPage.tsx`
-- `src/pages/MorePage.tsx`
-- `src/pages/OrdersPage.tsx`
-- `src/pages/ProductsPage.tsx`
-- `src/pages/SecurityPage.tsx`
-- `src/pages/SettingsPage.tsx`
-- `src/pages/StockMovementPage.tsx`
-- `src/pages/StockReportPage.tsx`
-- `src/pages/SupervisorDashboard.tsx`
-- `src/pages/VendorsPage.tsx`
+### 3. Backend - Install Puppeteer
+Update `backend/package.json` untuk menambahkan dependency `puppeteer`.
 
-### 4. Hapus Folder Komponen Inventory (11 folder)
-- `src/components/advanced/`
-- `src/components/ai/`
-- `src/components/alerts/`
-- `src/components/analytics/`
-- `src/components/api/`
-- `src/components/assets/`
-- `src/components/audit/`
-- `src/components/bulk/`
-- `src/components/dashboard/`
-- `src/components/filters/`
-- `src/components/inventory/`
-- `src/components/onboarding/`
-- `src/components/optimized/`
-- `src/components/products/`
-- `src/components/reports/`
-- `src/components/settings/`
-- `src/components/setup/`
-- `src/components/stock/`
-- `src/components/suppliers/`
-- `src/components/users/`
-- `src/components/enhanced/`
-- `src/components/responsive/`
-- `src/components/performance/`
+### 4. Backend - Register Route di server.js
+Tambahkan route baru di `backend/server.js`.
 
-### 5. Hapus Layout Inventory
-- `src/components/layout/AppSidebar.tsx` - Hapus (layout inventori)
-- `src/components/layout/MainLayout.tsx` - Hapus (layout inventori)
-- `src/components/layout/MobileBottomNav.tsx` - Hapus
-- `src/components/layout/MobileMoreMenu.tsx` - Hapus
-- `src/components/layout/QuickSearch.tsx` - Hapus
-- `src/components/layout/WelcomeSection.tsx` - Hapus
-- `src/components/layout/SyncStatusIndicator.tsx` - Hapus
-- `src/components/layout/EnhancedQuickSearch.tsx` - Hapus
-- `src/components/layout/ConnectionStatus.tsx` - Hapus
+### 5. Frontend - Update TechnicianSignatureReport.tsx
+- Hapus import `generateInstallationReportPDF` dari `psbActivationPdfGenerator`
+- Ubah `handleGeneratePDF` untuk memanggil backend API `/api/psb-activations/:id/generate-pdf`
+- Kirim formData (ontSerial, signatures, speed test, dll) sebagai request body
+- Download response blob sebagai file PDF
 
-Yang TETAP di layout:
-- `src/components/layout/NotificationCenter.tsx` (dipakai PSB & Gangguan)
-- `src/components/layout/TechnicianLayout.tsx` (dipakai teknisi)
-- `src/components/layout/TechnicianSidebar.tsx`
-- `src/components/layout/TechnicianMobileBottomNav.tsx`
+### 6. Frontend - Update TechnicianReportsPage.tsx
+- Hapus import `PDFService` dari `pdfService`
+- Ubah `handleGeneratePDF` untuk memanggil backend API
+- Kirim data activation ke backend untuk generate PDF
 
-### 6. Hapus Services Inventory (15 file)
-- `src/services/alertApi.ts`
-- `src/services/analyticsApi.ts`
-- `src/services/assetApi.ts`
-- `src/services/assetsApi.ts`
-- `src/services/customerApi.ts`
-- `src/services/dashboardApi.ts`
-- `src/services/inventoryApi.ts`
-- `src/services/legacyApi.ts`
-- `src/services/monitoringService.ts`
-- `src/services/orderApi.ts`
-- `src/services/productApi.ts`
-- `src/services/settingsApi.ts`
-- `src/services/skuValidationApi.ts`
-- `src/services/stockMovementApi.ts`
-- `src/services/supplierApi.ts`
-- `src/services/systemApi.ts`
+### 7. Hapus File Client-Side PDF
+- Hapus `src/services/pdfService.ts` (726 baris - jsPDF + html2canvas)
+- Hapus `src/utils/psbActivationPdfGenerator.ts` (578 baris - jsPDF + html2canvas)
 
-Yang TETAP:
-- `src/services/api.ts`, `apiClient.ts`, `apiResponseHandler.ts` (core)
-- `src/services/psbApi.ts`, `psbActivationApi.ts` (PSB)
-- `src/services/technicianApi.ts` (Teknisi)
-- `src/services/interruptionApi.ts` (Gangguan)
-- `src/services/userApi.ts` (auth)
-- `src/services/emailVerificationApi.ts` (auth)
-- `src/services/pdfService.ts` (PDF PSB)
-- `src/services/roleMapper.ts` (roles)
-- `src/services/apiKeyService.ts` (API keys)
+### 8. Cleanup Dependencies
+- Hapus `jspdf` dan `html2canvas` dari `package.json` frontend (mengurangi bundle size)
+- Puppeteer sudah ada di package.json frontend tapi tidak dipakai di client, tetap di backend saja
 
-### 7. Hapus Hooks Inventory (20+ file)
-- `src/hooks/useAnalyticsData.ts`
-- `src/hooks/useApiData.ts`
-- `src/hooks/useAssetManager.ts`
-- `src/hooks/useAssetMetadata.ts`
-- `src/hooks/useAuditLog.ts`
-- `src/hooks/useAutoAlerts.ts`
-- `src/hooks/useConnectionMonitor.ts`
-- `src/hooks/useConsolidatedProductManager.ts`
-- `src/hooks/useDashboardData.ts`
-- `src/hooks/useDataPersistence.ts`
-- `src/hooks/useEnhancedAssetManager.ts`
-- `src/hooks/useEnhancedProductManager.ts`
-- `src/hooks/useEnhancedStockManager.ts`
-- `src/hooks/useHybridData.ts`
-- `src/hooks/useNotifications.ts`
-- `src/hooks/useOptimizedAlerts.ts`
-- `src/hooks/useOptimizedAutoAlerts.ts`
-- `src/hooks/useOptimizedConnectionMonitor.ts`
-- `src/hooks/useOptimizedDashboard.ts`
-- `src/hooks/useOptimizedDashboardData.ts`
-- `src/hooks/useOptimizedStockAlerts.ts`
-- `src/hooks/usePerformanceMonitor.ts`
-- `src/hooks/usePerformanceOptimization.ts`
-- `src/hooks/useProductManager.ts`
-- `src/hooks/useProductMetadata.ts`
-- `src/hooks/useRealTimeSync.ts`
-- `src/hooks/useStockAlerts.ts`
-- `src/hooks/useStockMovement.ts`
-- `src/hooks/useSuperAdminDashboard.ts`
-- `src/hooks/useUserManager.ts`
+## Detail Teknis
 
-Yang TETAP:
-- `src/hooks/useAuth.ts`, `useAuthManager.ts` (auth)
-- `src/hooks/usePSBData.ts`, `usePSBAnalytics.ts`, `usePSBActivationAnalytics.ts`, `usePSBRealtimeNotifications.ts` (PSB)
-- `src/hooks/useTechnicianData.ts` (Teknisi)
-- `src/hooks/useApi.ts` (core)
-- `src/hooks/useErrorHandler.ts` (core)
-- `src/hooks/use-mobile.tsx`, `use-toast.ts` (UI)
-
-### 8. Hapus Types & Utils Inventory
-Types hapus:
-- `src/types/inventory.ts`
-- `src/types/inventory-extended.ts`
-- `src/types/assets.ts`
-- `src/types/orders.ts`
-- `src/types/alert-settings.ts`
-- `src/types/analytics.ts`
-- `src/types/stock-movement.ts`
-- `src/types/settings.ts`
-
-Utils hapus:
-- `src/utils/globalProductCache.ts`
-- `src/utils/productStatusHelpers.ts`
-- `src/utils/stockValidation.ts`
-- `src/utils/performanceOptimizer.ts`
-- `src/utils/productionOptimizer.ts`
-- `src/utils/requestThrottler.ts`
-- `src/utils/circuitBreaker.ts`
-- `src/utils/circuitBreakerOptimized.ts`
-- `src/utils/connectionManager.ts`
-- `src/utils/systemMonitor.ts`
-- `src/utils/build-optimizer.ts`
-- `src/data/constants.ts`
-- `src/data/mockSettings.ts`
-
-Contexts hapus:
-- `src/contexts/ProductContext.tsx`
-- `src/contexts/ApiContext.tsx`
-
-### 9. Update AppContext
-- `src/contexts/AppContext.tsx` - Hapus referensi ke `InventoryApiService`, simplify context
-
-### 10. Update main.tsx
-- Hapus import `performanceOptimizer`, `productionSecurity` yang tidak perlu
-
-### 11. Struktur Routing Baru
-
+### Endpoint API Baru
 ```text
-/                    -> Login / Redirect ke PSB
-/psb-report/*        -> PSB Layout (CS, Superadmin)
-/interruption/*      -> Gangguan Layout (semua role)
-/technician/*        -> Teknisi Layout (teknisi)
+POST /api/psb-activations/:id/generate-pdf
+Authorization: Bearer <token>
+Content-Type: application/json
+
+Body:
+{
+  "formData": {
+    "downloadSpeed": "50",
+    "uploadSpeed": "25",
+    "ping": "5",
+    "serviceType": "pasang_baru",
+    "packageSpeed": "50",
+    "fastelNumber": "...",
+    "contactPerson": "...",
+    "ontType": "ZTE F660",
+    "ontSerial": "ZTEG12345678",
+    "routerType": "...",
+    "routerSerial": "...",
+    "stbId": "...",
+    "area": "...",
+    "odc": "...",
+    "odp": "...",
+    "port": "...",
+    "dc": "...",
+    "soc": "..."
+  },
+  "signatures": {
+    "technician": "data:image/png;base64,...",
+    "customer": "data:image/png;base64,..."
+  }
+}
+
+Response: application/pdf (binary)
 ```
 
-## Yang TIDAK Diubah (Tetap Utuh)
-- Semua file di `src/components/psb/` 
-- Semua file di `src/components/interruption/`
-- Semua file di `src/components/technician/`
-- Semua file di `src/pages/psb/`
-- Semua file di `src/pages/interruption/`
-- Semua file di `src/pages/technician/`
-- `src/components/auth/` (login, protected route)
-- `src/components/ui/` (UI components)
-- `src/components/feedback/` (error boundary)
-- Backend folder (tidak diubah)
+### Alur Kerja Setelah Perubahan
+1. Teknisi isi semua form data (speed test, device, datek, dll)
+2. Teknisi isi tanda tangan teknisi dan pelanggan
+3. Teknisi simpan data (ke backend)
+4. Teknisi klik "Generate Berita Acara PDF"
+5. Frontend kirim request POST ke backend dengan formData + signatures
+6. Backend ambil data activation dari database, merge dengan formData
+7. Backend render HTML template dengan Puppeteer
+8. Backend generate PDF dan kirim kembali ke frontend
+9. Frontend download PDF otomatis
 
-## Estimasi
-- Menghapus 80+ file yang tidak diperlukan
-- Meng-update 5-8 file inti
-- Hasil: Aplikasi lebih ringan, fokus hanya PSB dan Gangguan
+### File yang Diubah/Dibuat
 
+| File | Aksi |
+|------|------|
+| `backend/routes/generatePdf.js` | BUAT BARU - route + template HTML + Puppeteer |
+| `backend/server.js` | UPDATE - register route baru |
+| `backend/package.json` | UPDATE - tambah puppeteer dependency |
+| `src/pages/technician/TechnicianSignatureReport.tsx` | UPDATE - panggil backend API |
+| `src/pages/technician/TechnicianReportsPage.tsx` | UPDATE - panggil backend API |
+| `src/services/pdfService.ts` | HAPUS |
+| `src/utils/psbActivationPdfGenerator.ts` | HAPUS |
+| `src/components/technician/InstallationReportGenerator.tsx` | UPDATE - hapus client-side PDF, gunakan backend |
+| `package.json` | UPDATE - hapus jspdf, html2canvas |
+
+### Catatan Penting
+- Puppeteer perlu diinstall di server backend (`npm install puppeteer` di folder backend)
+- Untuk server production, mungkin perlu `puppeteer-core` + chromium yang sudah terinstall
+- Template HTML akan di-render langsung di memory (tidak perlu file terpisah)
+- Logo TelNet Fiber akan di-embed sebagai base64 di template agar tidak perlu load dari file
