@@ -36,6 +36,7 @@ const psbOrderRoutes = require("./routes/psbOrders");
 const psbActivationRoutes = require("./routes/psbActivations");
 const technicianRoutes = require("./routes/technicians");
 const interruptionReportRoutes = require("./routes/interruptionReports");
+const generatePdfRoutes = require("./routes/generatePdf");
 
 const errorHandler = require("./middleware/errorHandler");
 const { standardErrorHandler } = require("./middleware/standardErrorHandler");
@@ -219,6 +220,8 @@ app.use(
   logAdminActivity("Accessed PSB activations"),
   psbActivationRoutes
 );
+// PDF Generation route for PSB Activations
+app.use("/api/psb-activations", auth, generatePdfRoutes);
 app.use(
   "/api/technicians",
   auth,
