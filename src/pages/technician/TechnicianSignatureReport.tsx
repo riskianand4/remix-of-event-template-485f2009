@@ -9,8 +9,8 @@ import { psbActivationApi } from '@/services/psbActivationApi';
 import { PSBActivation } from '@/types/psb';
 import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { DigitalSignaturePad } from '@/components/technician/DigitalSignaturePad';
-import { generateInstallationReportPDF } from '@/utils/psbActivationPdfGenerator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ENV } from '@/config/environment';
 
 export default function TechnicianSignatureReport() {
   const { id } = useParams<{ id: string }>();
@@ -196,54 +196,42 @@ export default function TechnicianSignatureReport() {
     try {
       setGenerating(true);
       
-      // CRITICAL FIX: Create activation object with current form data
-      // This ensures the PDF uses the latest data from the form, not stale data from server
-      const activationWithFormData: PSBActivation = {
-        ...activation,
-        installationReport: {
-          ...activation.installationReport,
-          speedTest: {
-            download: parseFloat(formData.downloadSpeed) || undefined,
-            upload: parseFloat(formData.uploadSpeed) || undefined,
-            ping: parseFloat(formData.ping) || undefined
-          },
-          device: {
-            ontType: formData.ontType || undefined,
-            ontSerial: formData.ontSerial || undefined, // Use form data directly
-            routerType: formData.routerType || undefined,
-            routerSerial: formData.routerSerial || undefined,
-            stbId: formData.stbId || undefined
-          },
-          datek: {
-            area: formData.area || undefined,
-            odc: formData.odc || undefined,
-            odp: formData.odp || undefined,
-            port: formData.port || undefined,
-            dc: formData.dc || undefined,
-            soc: formData.soc || undefined
-          },
-          serviceType: (formData.serviceType as 'pasang_baru' | 'cabut' | 'upgrade' | 'downgrade' | 'pda') || undefined,
-          packageSpeed: formData.packageSpeed ? parseInt(formData.packageSpeed) as (20 | 30 | 40 | 50 | 100) : undefined,
-          fastelNumber: formData.fastelNumber || undefined,
-          contactPerson: formData.contactPerson || undefined,
+      // Call backend API to generate PDF via Puppeteer
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${ENV.API_BASE_URL}/api/psb-activations/${id}/generate-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          formData,
           signatures: {
             technician: technicianSignature,
             customer: customerSignature,
-            signedAt: new Date().toISOString()
-          }
-        }
-      };
-      
-      await generateInstallationReportPDF(
-        activationWithFormData,
-        technicianSignature,
-        customerSignature
-      );
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      // Download the PDF blob
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Berita-Acara-${activation.serviceNumber}-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
       // Update status to report generated
       await psbActivationApi.updateActivation(id!, {
         installationReport: {
-          ...activationWithFormData.installationReport,
+          ...activation.installationReport,
           reportGenerated: true,
           reportGeneratedAt: new Date().toISOString()
         }
