@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,38 +12,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users,
   Clock,
-  AlertCircle,
   UserCheck,
   Search,
-  Filter,
   RefreshCw,
-  CheckCircle,
+  CheckCircle2,
   MapPin,
   Phone,
   Edit,
+  GitBranch,
+  SendHorizontal,
+  AlertCircle,
+  ListFilter,
+  Inbox,
 } from "lucide-react";
-import { getTechnicianName } from '@/utils/psbHelpers';
+import { getTechnicianName } from "@/utils/psbHelpers";
 import { usePSBData } from "@/hooks/usePSBData";
 import { logger } from "@/utils/logger";
 import { PSBOrder } from "@/types/psb";
 import { format } from "date-fns";
-import { getAllTechnicians } from "@/services/technicianApi";
 import { getAllUsers } from "@/services/userApi";
 import { PSBDistributionDetailDialog } from "@/components/psb/PSBDistributionDetailDialog";
 import { PSBAssignConfirmDialog } from "@/components/psb/PSBAssignConfirmDialog";
@@ -51,15 +47,54 @@ import { TechnicianStatusDialog } from "@/components/psb/TechnicianStatusDialog"
 import { psbApi } from "@/services/psbApi";
 import { toast } from "sonner";
 
+/* ─────────────────────────── helpers ─────────────────────────── */
+
+const techStatusConfig = {
+  complete: { label: "Complete", cls: "bg-emerald-500/10 text-emerald-600 border-emerald-200", dot: "bg-emerald-500" },
+  pending:  { label: "Pending",  cls: "bg-amber-500/10  text-amber-600  border-amber-200",  dot: "bg-amber-500"  },
+  failed:   { label: "Failed",   cls: "bg-red-500/10    text-red-600    border-red-200",    dot: "bg-red-500"    },
+} as const;
+
+type TechStatus = keyof typeof techStatusConfig;
+
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  icon: React.FC<{ className?: string }>;
+  accentBar: string;
+  iconBg: string;
+  iconColor: string;
+}
+
+const StatCard: React.FC<StatCardProps> = ({
+  label, value, icon: Icon, accentBar, iconBg, iconColor,
+}) => (
+  <Card className="relative overflow-hidden border-border/60 shadow-sm hover:shadow-md transition-shadow">
+    <div className={`absolute left-0 inset-y-0 w-1 ${accentBar}`} />
+    <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-[0.05] pointer-events-none">
+      <Icon className="h-16 w-16" />
+    </div>
+    <CardContent className="pl-6 pr-4 py-5">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">
+        {label}
+      </p>
+      <p className="text-3xl font-bold text-foreground">{value}</p>
+      <div className={`mt-2 flex h-7 w-7 items-center justify-center rounded-lg ${iconBg}`}>
+        <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
+      </div>
+    </CardContent>
+  </Card>
+);
+
+/* ─────────────────────────── main ─────────────────────────── */
+
 export const PSBDistribution: React.FC = () => {
   const { orders, fetchOrders, fetchAllOrders, updateOrder, loading } = usePSBData();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCluster, setSelectedCluster] = useState<string>("all");
   const [selectedTechnician, setSelectedTechnician] = useState<string>("");
   const [isAssigning, setIsAssigning] = useState<string | null>(null);
-  const [availableTechnicians, setAvailableTechnicians] = useState<string[]>(
-    []
-  );
+  const [availableTechnicians, setAvailableTechnicians] = useState<string[]>([]);
   const [totalTechnicians, setTotalTechnicians] = useState(0);
   const [selectedOrder, setSelectedOrder] = useState<PSBOrder | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -70,148 +105,83 @@ export const PSBDistribution: React.FC = () => {
   const [technicianStatusDialogOpen, setTechnicianStatusDialogOpen] = useState(false);
   const [selectedOrderForStatus, setSelectedOrderForStatus] = useState<PSBOrder | null>(null);
 
-  // Fetch orders on component mount - Get ALL orders for distribution
-  useEffect(() => {
-    // Use fetchAllOrders to get all orders without pagination limit
-    fetchAllOrders();
-  }, [fetchAllOrders]);
+  useEffect(() => { fetchAllOrders(); }, [fetchAllOrders]);
 
-  // Filter orders that need assignment (Pending status OR no technician assigned)
-  const unassignedOrders =
-    orders?.filter((order) => {
-      const techName = getTechnicianName(order).trim();
-      const hasNoTechnician = !techName;
-      return order.status === "Pending" || hasNoTechnician;
-    }) || [];
-
-  // Debug logging
-  console.log("Distribution Debug:", {
-    totalOrders: orders?.length || 0,
-    unassignedOrders: unassignedOrders.length,
-    ordersWithoutTech:
-      orders?.filter((o) => !getTechnicianName(o))
-        .length || 0,
-    pendingOrders: orders?.filter((o) => o.status === "Pending").length || 0,
-    sampleOrder: orders?.[0] || null,
-  });
-
-  // Fetch available technicians from API
   useEffect(() => {
     const fetchTechnicians = async () => {
       try {
-        // Get users with teknisi role
         const users = await getAllUsers();
-        const technicianUsers = users.filter((user) => user.role === "teknisi");
-
-        setAvailableTechnicians(technicianUsers.map((user) => user.name));
-        setTotalTechnicians(technicianUsers.length);
-      } catch (error) {
-        logger.error("Failed to fetch technicians", error, "PSBDistribution");
-        // Fallback data
-        const fallbackTechnicians = [
-          "Ahmad Hidayat",
-          "Budi Santoso",
-          "Citra Dewi",
-          "Doni Prakasa",
-          "Eko Wijaya",
-          "Fajar Rahman",
-          "Gita Sari",
-        ];
-        setAvailableTechnicians(fallbackTechnicians);
-        setTotalTechnicians(fallbackTechnicians.length);
+        const techUsers = users.filter((u) => u.role === "teknisi");
+        setAvailableTechnicians(techUsers.map((u) => u.name));
+        setTotalTechnicians(techUsers.length);
+      } catch {
+        const fallback = ["Ahmad Hidayat","Budi Santoso","Citra Dewi","Doni Prakasa","Eko Wijaya","Fajar Rahman","Gita Sari"];
+        setAvailableTechnicians(fallback);
+        setTotalTechnicians(fallback.length);
       }
     };
-
     fetchTechnicians();
   }, []);
 
-  // Get unique clusters from orders
-  const clusters = Array.from(
-    new Set(orders?.map((order) => order.cluster) || [])
-  );
+  const unassignedOrders =
+    orders?.filter((o) => {
+      const techName = getTechnicianName(o).trim();
+      return o.status === "Pending" || !techName;
+    }) ?? [];
 
-  // Filter pending orders based on search and cluster
-  const filteredOrders = unassignedOrders.filter((order) => {
-    const matchesSearch =
-      order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.orderNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.address.toLowerCase().includes(searchTerm.toLowerCase());
+  const clusters = Array.from(new Set(orders?.map((o) => o.cluster) ?? []));
 
-    const matchesCluster =
-      selectedCluster === "all" || order.cluster === selectedCluster;
-
-    return matchesSearch && matchesCluster;
+  const filteredOrders = unassignedOrders.filter((o) => {
+    const q = searchTerm.toLowerCase();
+    const matchSearch =
+      o.customerName.toLowerCase().includes(q) ||
+      o.orderNo.toLowerCase().includes(q) ||
+      o.address.toLowerCase().includes(q);
+    return matchSearch && (selectedCluster === "all" || o.cluster === selectedCluster);
   });
 
-  const handleAssignTechnician = async (orderId: string) => {
-    if (!selectedTechnician) {
-      alert("Pilih teknisi terlebih dahulu");
-      return;
-    }
-
-    const order = orders?.find(o => o._id === orderId);
+  const handleAssignTechnician = (orderId: string) => {
+    if (!selectedTechnician) { toast.warning("Pilih teknisi terlebih dahulu"); return; }
+    const order = orders?.find((o) => o._id === orderId);
     if (!order) return;
-
     setConfirmOrder(order);
     setConfirmDialogOpen(true);
   };
 
   const handleConfirmAssign = async () => {
     if (!confirmOrder || !selectedTechnician) return;
-
     setIsAssigning(confirmOrder._id);
     try {
-      await updateOrder(confirmOrder._id, {
-        status: "Assigned",
-        technician: selectedTechnician,
-        assignedAt: new Date().toISOString(),
-      });
-
+      await updateOrder(confirmOrder._id, { status: "Assigned", technician: selectedTechnician, assignedAt: new Date().toISOString() });
       setSelectedTechnician("");
       setConfirmDialogOpen(false);
       setConfirmOrder(null);
       await fetchOrders({ limit: 1000 });
-    } catch (error) {
-      logger.error("Failed to assign technician", error, "PSBDistribution");
+    } catch (e) {
+      logger.error("Failed to assign technician", e, "PSBDistribution");
     } finally {
       setIsAssigning(null);
     }
   };
 
   const handleBulkAssign = () => {
-    if (!selectedTechnician) {
-      alert("Pilih teknisi terlebih dahulu");
-      return;
-    }
-
-    if (filteredOrders.length === 0) {
-      alert("Tidak ada order yang akan di-assign");
-      return;
-    }
-
+    if (!selectedTechnician) { toast.warning("Pilih teknisi terlebih dahulu"); return; }
+    if (filteredOrders.length === 0) { toast.warning("Tidak ada order yang akan di-assign"); return; }
     setBulkConfirmDialogOpen(true);
   };
 
   const handleConfirmBulkAssign = async () => {
     if (!selectedTechnician || filteredOrders.length === 0) return;
-
     setIsBulkAssigning(true);
     try {
-      await Promise.all(
-        filteredOrders.map(order =>
-          updateOrder(order._id, {
-            status: "Assigned",
-            technician: selectedTechnician,
-            assignedAt: new Date().toISOString(),
-          })
-        )
-      );
-
+      await Promise.all(filteredOrders.map((o) =>
+        updateOrder(o._id, { status: "Assigned", technician: selectedTechnician, assignedAt: new Date().toISOString() })
+      ));
       setSelectedTechnician("");
       setBulkConfirmDialogOpen(false);
       await fetchOrders({ limit: 1000 });
-    } catch (error) {
-      logger.error("Failed to bulk assign technician", error, "PSBDistribution");
+    } catch (e) {
+      logger.error("Failed to bulk assign", e, "PSBDistribution");
     } finally {
       setIsBulkAssigning(false);
     }
@@ -227,363 +197,477 @@ export const PSBDistribution: React.FC = () => {
       await psbApi.updateTechnicianStatus(orderId, status, reason);
       toast.success("Status teknisi berhasil diupdate");
       await fetchOrders({ limit: 1000 });
-    } catch (error) {
-      logger.error("Failed to update technician status", error, "PSBDistribution");
+    } catch {
       toast.error("Gagal mengupdate status");
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Pending":
-        return (
-          <Badge className="bg-yellow-500 text-white">
-            Menunggu Assignment
-          </Badge>
-        );
-      case "Assigned":
-        return <Badge className="bg-blue-500 text-white">Sudah Assigned</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
+  const getOrderStatusBadge = (status: string) => {
+    if (status === "Pending")
+      return <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-600"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Pending</span>;
+    if (status === "Assigned")
+      return <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-500/10 px-2.5 py-0.5 text-xs font-medium text-blue-600"><span className="h-1.5 w-1.5 rounded-full bg-blue-500" />Assigned</span>;
+    return <Badge variant="outline">{status}</Badge>;
   };
 
-  const getTechnicianStatusBadge = (order: PSBOrder) => {
-    if (!order.technicianStatus) {
-      return <Badge variant="outline" className="text-xs">Not Set</Badge>;
-    }
-
-    switch (order.technicianStatus) {
-      case "complete":
-        return (
-          <Badge className="bg-green-500 text-white text-xs">
-            Complete
-          </Badge>
-        );
-      case "pending":
-        return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger>
-                <Badge className="bg-yellow-500 text-white text-xs">
-                  Pending
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs">{order.technicianStatusReason || "No reason provided"}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
-      case "failed":
-        return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger>
-                <Badge className="bg-red-500 text-white text-xs">
-                  Failed
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs">{order.technicianStatusReason || "No reason provided"}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
-      default:
-        return null;
-    }
+  const getTechStatusBadge = (order: PSBOrder) => {
+    if (!order.technicianStatus) return <span className="text-xs text-muted-foreground">—</span>;
+    const cfg = techStatusConfig[order.technicianStatus as TechStatus];
+    if (!cfg) return null;
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${cfg.cls}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+              {cfg.label}
+            </span>
+          </TooltipTrigger>
+          {order.technicianStatusReason && (
+            <TooltipContent>
+              <p className="max-w-xs">{order.technicianStatusReason}</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
+      </TooltipProvider>
+    );
   };
 
+  const assignedOrders = orders?.filter((o) => o.status === "Assigned") ?? [];
+
+  /* ─── render ─── */
   return (
-    <div className="space-y-6 p-0 sm:w-full w-[360px]">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="sm:text-2xl text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-            Distribution Center
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Assign teknisi ke order yang belum ditangani
-          </p>
+    <div className="space-y-8">
+      {/* ── Header ─────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/5 via-background to-primary/10 p-6 sm:p-8"
+      >
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-[0.04] pointer-events-none">
+          <GitBranch className="h-36 w-36" />
         </div>
-        <Button onClick={fetchAllOrders} variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
-
-      {/* Stats Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Orders Butuh Teknisi
-                </p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {loading ? "..." : unassignedOrders.length}
-                </p>
-              </div>
-              <Clock className="h-8 w-8 text-yellow-600" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full border bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+              <GitBranch className="h-3 w-3" />
+              Assignment Center
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Total Orders
-                </p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {loading ? "..." : orders?.length || 0}
-                </p>
-              </div>
-              <Users className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Available Technicians
-                </p>
-                <p className="text-2xl font-bold text-green-600">
-                  {totalTechnicians}
-                </p>
-              </div>
-              <MapPin className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filter & Assignment
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Cari nama, order, alamat..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Cluster</label>
-              <Select
-                value={selectedCluster}
-                onValueChange={setSelectedCluster}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih cluster" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Cluster</SelectItem>
-                  {clusters.map((cluster) => (
-                    <SelectItem key={cluster} value={cluster}>
-                      {cluster}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Assign Technician</label>
-              <Select
-                value={selectedTechnician}
-                onValueChange={setSelectedTechnician}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih teknisi" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableTechnicians.map((tech) => (
-                    <SelectItem key={tech} value={tech}>
-                      {tech}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium invisible">Action</label>
-              <Button
-                className="w-full"
-                disabled={!selectedTechnician || isBulkAssigning}
-                onClick={handleBulkAssign}
-              >
-                <UserCheck className="h-4 w-4 mr-2" />
-                {isBulkAssigning ? 'Assigning...' : 'Assign Selected'}
-              </Button>
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
+              Distribution Center
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Assign teknisi ke order yang belum ditangani secara cepat dan efisien
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <Button
+            variant="outline"
+            onClick={fetchAllOrders}
+            className="sm:shrink-0 gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+      </motion.div>
 
-      {/* Pending Orders List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Order Butuh Assignment ({filteredOrders.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">
-              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">Loading orders...</p>
+      {/* ── Stat Cards ─────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.08 }}
+        className="grid grid-cols-2 md:grid-cols-3 gap-4"
+      >
+        <StatCard
+          label="Butuh Teknisi"
+          value={loading ? "…" : unassignedOrders.length}
+          icon={Clock}
+          accentBar="bg-amber-500"
+          iconBg="bg-amber-500/15"
+          iconColor="text-amber-600"
+        />
+        <StatCard
+          label="Total Orders"
+          value={loading ? "…" : orders?.length ?? 0}
+          icon={Users}
+          accentBar="bg-blue-500"
+          iconBg="bg-blue-500/15"
+          iconColor="text-blue-600"
+        />
+        <StatCard
+          label="Teknisi Tersedia"
+          value={totalTechnicians}
+          icon={UserCheck}
+          accentBar="bg-emerald-500"
+          iconBg="bg-emerald-500/15"
+          iconColor="text-emerald-600"
+        />
+      </motion.div>
+
+      {/* ── Filter & Assignment ─────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.14 }}
+      >
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <ListFilter className="h-4 w-4 text-primary" />
+              </div>
+              Filter &amp; Assignment
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Search */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Cari Order
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Nama, order, alamat…"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 h-10"
+                  />
+                </div>
+              </div>
+
+              {/* Cluster */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Cluster
+                </label>
+                <Select value={selectedCluster} onValueChange={setSelectedCluster}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Semua cluster" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Cluster</SelectItem>
+                    {clusters.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Teknisi */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Pilih Teknisi
+                </label>
+                <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Pilih teknisi…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTechnicians.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Bulk assign */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground invisible">
+                  Aksi
+                </label>
+                <Button
+                  className="w-full h-10 gap-2"
+                  disabled={!selectedTechnician || isBulkAssigning}
+                  onClick={handleBulkAssign}
+                >
+                  {isBulkAssigning ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <SendHorizontal className="h-4 w-4" />
+                  )}
+                  {isBulkAssigning ? "Assigning…" : `Assign ${filteredOrders.length > 0 ? `(${filteredOrders.length})` : "Semua"}`}
+                </Button>
+              </div>
             </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="text-center py-8">
-              <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                {unassignedOrders.length === 0
-                  ? "Semua order sudah punya teknisi"
-                  : "Tidak ada order yang sesuai dengan filter"}
-              </p>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* ── Orders Table ────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.2 }}
+      >
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
+                  <Inbox className="h-4 w-4 text-amber-600" />
+                </div>
+                Order Butuh Assignment
+              </CardTitle>
+              <Badge variant="secondary" className="rounded-full px-3 text-xs font-semibold">
+                {filteredOrders.length} order
+              </Badge>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order No</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Telepon</TableHead>
-                  <TableHead>Cluster</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Tech Status</TableHead>
-                  <TableHead>Teknisi</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow
-                    key={order._id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => {
-                      setSelectedOrder(order);
-                      setDetailDialogOpen(true);
-                    }}
-                  >
-                    <TableCell>
-                      <Badge variant="outline">{order.orderNo}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{order.customerName}</div>
-                        <div className="text-sm text-muted-foreground truncate max-w-xs">
-                          {order.address}
+          </CardHeader>
+
+          <CardContent className="p-0">
+            {/* Loading */}
+            {loading ? (
+              <div className="p-6 space-y-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center gap-4 rounded-xl border border-border/50 p-4">
+                    <Skeleton className="h-8 w-24 rounded-lg" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-3.5 w-36" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                    <Skeleton className="h-7 w-20 rounded-full" />
+                    <Skeleton className="h-8 w-20 rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              /* Empty */
+              <div className="py-16 flex flex-col items-center gap-4 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+                  <CheckCircle2 className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground/70">
+                    {unassignedOrders.length === 0 ? "Semua order sudah punya teknisi 🎉" : "Tidak ada order sesuai filter"}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {unassignedOrders.length === 0
+                      ? "Semua order telah berhasil di-assign"
+                      : "Coba ubah filter pencarian"}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              /* Desktop table */
+              <>
+                <div className="hidden lg:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-t border-b border-border/50 bg-muted/30">
+                        {["Order No", "Customer", "Telepon", "Cluster", "Status", "Tech Status", "Teknisi", "Aksi"].map((h) => (
+                          <th key={h} className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      <AnimatePresence>
+                        {filteredOrders.map((order, i) => (
+                          <motion.tr
+                            key={order._id}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: i * 0.03 }}
+                            className="group hover:bg-muted/30 transition-colors cursor-pointer"
+                            onClick={() => { setSelectedOrder(order); setDetailDialogOpen(true); }}
+                          >
+                            <td className="px-5 py-4">
+                              <Badge variant="outline" className="font-mono text-xs">
+                                {order.orderNo}
+                              </Badge>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="font-medium text-sm">{order.customerName}</div>
+                              <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-[180px]">
+                                {order.address}
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Phone className="h-3 w-3 shrink-0" />
+                                {order.customerPhone}
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-500/10 px-2.5 py-0.5 text-xs font-medium text-blue-600">
+                                <MapPin className="h-2.5 w-2.5" />
+                                {order.cluster}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex flex-col gap-1">
+                                {getOrderStatusBadge(order.status)}
+                                {getTechnicianName(order) ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-500/10 px-2 py-0.5 text-xs font-medium text-orange-600">Re-assign</span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600">Unassigned</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-2">
+                                {getTechStatusBadge(order)}
+                                {getTechnicianName(order) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => { e.stopPropagation(); handleUpdateStatus(order); }}
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 text-sm font-medium">
+                              {getTechnicianName(order) || <span className="text-muted-foreground text-xs">—</span>}
+                            </td>
+                            <td className="px-5 py-4">
+                              <Button
+                                size="sm"
+                                className="gap-1.5 h-8"
+                                disabled={!selectedTechnician || isAssigning === order._id}
+                                onClick={(e) => { e.stopPropagation(); handleAssignTechnician(order._id); }}
+                              >
+                                {isAssigning === order._id ? (
+                                  <RefreshCw className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <UserCheck className="h-3 w-3" />
+                                )}
+                                Assign
+                              </Button>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile card list */}
+                <div className="lg:hidden divide-y divide-border/40">
+                  {filteredOrders.map((order, i) => (
+                    <motion.div
+                      key={order._id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      className="p-4 hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => { setSelectedOrder(order); setDetailDialogOpen(true); }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <Badge variant="outline" className="font-mono text-xs shrink-0">
+                              {order.orderNo}
+                            </Badge>
+                            {getOrderStatusBadge(order.status)}
+                          </div>
+                          <p className="font-medium text-sm truncate">{order.customerName}</p>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-2.5 w-2.5" />{order.cluster}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Phone className="h-2.5 w-2.5" />{order.customerPhone}
+                            </span>
+                          </div>
+                          {getTechnicianName(order) && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Teknisi: <span className="font-medium text-foreground">{getTechnicianName(order)}</span>
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          className="shrink-0 h-8 gap-1 text-xs"
+                          disabled={!selectedTechnician || isAssigning === order._id}
+                          onClick={(e) => { e.stopPropagation(); handleAssignTechnician(order._id); }}
+                        >
+                          {isAssigning === order._id ? (
+                            <RefreshCw className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <UserCheck className="h-3 w-3" />
+                          )}
+                          Assign
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* ── Recently Assigned ───────────────────── */}
+      <AnimatePresence>
+        {assignedOrders.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.25 }}
+          >
+            <Card className="border-border/60 shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  Recently Assigned
+                  <Badge variant="secondary" className="rounded-full px-3 text-xs ml-auto font-semibold">
+                    {assignedOrders.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border/40">
+                  {assignedOrders.slice(0, 5).map((order, i) => (
+                    <motion.div
+                      key={order._id}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="flex items-center gap-4 px-6 py-4 hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
+                        <UserCheck className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="font-mono text-xs shrink-0">{order.orderNo}</Badge>
+                          <span className="font-medium text-sm truncate">{order.customerName}</span>
+                          <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 shrink-0">
+                            {order.cluster}
+                          </span>
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>{order.customerPhone}</TableCell>
-                    <TableCell>
-                      <Badge className="bg-blue-500 text-white">
-                        {order.cluster}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(order.status)}
-                        {getTechnicianName(order) ? (
-                          <Badge className="bg-orange-500 text-white text-xs">
-                            Re-assign
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-yellow-500 text-white text-xs">
-                            Unassigned
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getTechnicianStatusBadge(order)}
-                        {getTechnicianName(order) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUpdateStatus(order);
-                            }}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getTechnicianName(order) ? (
-                        <span className="text-sm font-medium">
+                      <div className="shrink-0 flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Users className="h-3.5 w-3.5" />
+                        <span className="font-medium text-foreground text-xs max-w-[110px] truncate">
                           {getTechnicianName(order)}
                         </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAssignTechnician(order._id);
-                        }}
-                        disabled={
-                          !selectedTechnician || isAssigning === order._id
-                        }
-                      >
-                        {isAssigning === order._id ? (
-                          <>
-                            <Clock className="h-4 w-4 mr-2 animate-spin" />
-                            Assigning...
-                          </>
-                        ) : (
-                          <>
-                            <UserCheck className="h-4 w-4 mr-2" />
-                            Assign
-                          </>
-                        )}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Detail Dialog */}
+      {/* ── Dialogs ─────────────────────────────── */}
       <PSBDistributionDetailDialog
         order={selectedOrder}
         open={detailDialogOpen}
         onOpenChange={setDetailDialogOpen}
       />
-
-      {/* Assign Confirmation Dialog */}
       <PSBAssignConfirmDialog
         open={confirmDialogOpen}
         onOpenChange={setConfirmDialogOpen}
@@ -592,8 +676,6 @@ export const PSBDistribution: React.FC = () => {
         onConfirm={handleConfirmAssign}
         isAssigning={isAssigning === confirmOrder?._id}
       />
-
-      {/* Bulk Assign Confirmation Dialog */}
       <PSBBulkAssignConfirmDialog
         open={bulkConfirmDialogOpen}
         onOpenChange={setBulkConfirmDialogOpen}
@@ -602,84 +684,12 @@ export const PSBDistribution: React.FC = () => {
         onConfirm={handleConfirmBulkAssign}
         isAssigning={isBulkAssigning}
       />
-
-      {/* Technician Status Dialog */}
       <TechnicianStatusDialog
         open={technicianStatusDialogOpen}
         onOpenChange={setTechnicianStatusDialogOpen}
         order={selectedOrderForStatus}
         onSave={handleSaveStatus}
       />
-
-      {/* Assigned Orders Preview */}
-      {orders?.filter((order) => order.status === "Assigned").length > 0 && (
-        <Card>
-          <CardHeader className="p-3 sm:p-4 lg:p-6">
-            <CardTitle className="text-base sm:text-lg">
-              Recently Assigned Orders
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
-            <div className="space-y-2 sm:space-y-3">
-              {orders
-                ?.filter((order) => order.status === "Assigned")
-                .slice(0, 5)
-                .map((order) => (
-                  <div
-                    key={order._id}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 sm:p-3 border rounded-lg gap-2 sm:gap-3 min-w-0"
-                  >
-                    {/* Mobile Layout - Stacked */}
-                    <div className="flex flex-col sm:hidden gap-2 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className="text-xs shrink-0">
-                          {order.orderNo}
-                        </Badge>
-                        <Badge className="bg-blue-500 text-white text-xs shrink-0">
-                          {order.cluster}
-                        </Badge>
-                      </div>
-                      <div className="min-w-0">
-                        <span className="font-medium text-sm truncate block">
-                          {order.customerName}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <span className="text-xs font-medium text-muted-foreground truncate">
-                          {getTechnicianName(order)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Desktop Layout - Horizontal */}
-                    <div className="hidden sm:flex sm:items-center sm:gap-3 min-w-0 flex-1">
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        {order.orderNo}
-                      </Badge>
-                      <span className="font-medium text-sm truncate min-w-0">
-                        {order.customerName}
-                      </span>
-                      <Badge className="bg-blue-500 text-white text-xs shrink-0">
-                        {order.cluster}
-                      </Badge>
-                    </div>
-
-                    <div className="hidden sm:flex sm:items-center sm:gap-2 shrink-0">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span
-                        className="text-sm font-medium truncate max-w-[120px]"
-                        title={getTechnicianName(order)}
-                      >
-                        {getTechnicianName(order)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };
