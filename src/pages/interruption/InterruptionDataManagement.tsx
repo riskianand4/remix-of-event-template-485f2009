@@ -1,14 +1,8 @@
 import React, { useState, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter } from "lucide-react";
+import { Plus, Search, Filter, AlertTriangle, FileText, RefreshCw } from "lucide-react";
 import { ModernInterruptionTable } from "@/components/interruption/ModernInterruptionTable";
 import {
   getAllInterruptionReports,
@@ -39,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { getTechnicians } from "@/services/interruptionApi";
 
 export const InterruptionDataManagement: React.FC = () => {
@@ -72,13 +67,10 @@ export const InterruptionDataManagement: React.FC = () => {
   const loadTechnicians = async () => {
     try {
       const techList = await getTechnicians();
-      console.log("✅ Raw technician response:", techList);
-
       const formatted = techList.map((t: any) => ({
         _id: t._id || t.id,
         name: t.name,
       }));
-
       setTechnicians(formatted);
     } catch (error) {
       console.error("❌ Error loading technicians:", error);
@@ -96,8 +88,6 @@ export const InterruptionDataManagement: React.FC = () => {
           search: searchQuery,
           status: statusFilter || undefined,
         });
-      console.log("📡 API response from getAllInterruptionReports:", data);
-      console.log("📊 Total count:", totalCount);
       setReports(data);
       setTotal(totalCount);
     } catch (error) {
@@ -113,12 +103,10 @@ export const InterruptionDataManagement: React.FC = () => {
     data: Partial<InterruptionReport>
   ) => {
     try {
-      // Convert technician object to string if needed
       const updateData: any = { ...data };
       if (updateData.technician && typeof updateData.technician === "object") {
         updateData.technician = updateData.technician._id;
       }
-
       await updateInterruptionReport(id, updateData);
       await loadReports();
       toast.success("Data berhasil diperbarui");
@@ -145,7 +133,6 @@ export const InterruptionDataManagement: React.FC = () => {
         toast.error("Nomor layanan dan teknisi harus diisi");
         return;
       }
-
       await createInterruptionReport(newReport);
       await loadReports();
       setShowAddDialog(false);
@@ -168,29 +155,34 @@ export const InterruptionDataManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Modern Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0"
+        className="relative overflow-hidden rounded-xl bg-gradient-to-br from-destructive/10 via-destructive/5 to-background border border-border/50 p-5 sm:p-6"
       >
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-destructive to-destructive/70 bg-clip-text text-transparent">
-            Data Management Gangguan
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Kelola semua tiket gangguan dengan inline editing
-          </p>
+        <div className="absolute top-0 right-0 opacity-[0.07]">
+          <AlertTriangle className="w-32 h-32 sm:w-40 sm:h-40 -mt-4 -mr-4" />
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">
+                Data Management Gangguan
+              </h1>
+              <Badge variant="secondary" className="text-xs">
+                {total} tiket
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Kelola semua tiket gangguan dengan inline editing
+            </p>
+          </div>
           <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <DialogTrigger asChild>
-              <Button
-                size="sm"
-                className="flex-1 sm:flex-none text-xs sm:text-sm bg-gradient-to-r from-destructive to-destructive/80 hover:from-destructive/90 hover:to-destructive/70"
-              >
-                <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="ml-1 sm:ml-2">Tambah Tiket</span>
+              <Button size="sm" className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                <Plus className="w-4 h-4 mr-1.5" />
+                Tambah Tiket
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
@@ -207,10 +199,7 @@ export const InterruptionDataManagement: React.FC = () => {
                     <Input
                       value={newReport.serviceNumber}
                       onChange={(e) =>
-                        setNewReport({
-                          ...newReport,
-                          serviceNumber: e.target.value,
-                        })
+                        setNewReport({ ...newReport, serviceNumber: e.target.value })
                       }
                       placeholder="Masukkan nomor layanan"
                     />
@@ -220,10 +209,7 @@ export const InterruptionDataManagement: React.FC = () => {
                     <Input
                       value={newReport.customerName}
                       onChange={(e) =>
-                        setNewReport({
-                          ...newReport,
-                          customerName: e.target.value,
-                        })
+                        setNewReport({ ...newReport, customerName: e.target.value })
                       }
                       placeholder="Nama pelanggan"
                     />
@@ -245,10 +231,7 @@ export const InterruptionDataManagement: React.FC = () => {
                     <Input
                       value={newReport.contactNumber}
                       onChange={(e) =>
-                        setNewReport({
-                          ...newReport,
-                          contactNumber: e.target.value,
-                        })
+                        setNewReport({ ...newReport, contactNumber: e.target.value })
                       }
                       placeholder="Nomor telepon"
                     />
@@ -258,10 +241,7 @@ export const InterruptionDataManagement: React.FC = () => {
                     <Input
                       value={newReport.interruptionType}
                       onChange={(e) =>
-                        setNewReport({
-                          ...newReport,
-                          interruptionType: e.target.value,
-                        })
+                        setNewReport({ ...newReport, interruptionType: e.target.value })
                       }
                       placeholder="Jenis gangguan"
                     />
@@ -294,10 +274,7 @@ export const InterruptionDataManagement: React.FC = () => {
                       list="ticket-status-options"
                       value={newReport.ticketStatus}
                       onChange={(e) =>
-                        setNewReport({
-                          ...newReport,
-                          ticketStatus: e.target.value,
-                        })
+                        setNewReport({ ...newReport, ticketStatus: e.target.value })
                       }
                       placeholder="Pilih dari daftar atau ketik manual"
                     />
@@ -316,10 +293,7 @@ export const InterruptionDataManagement: React.FC = () => {
                 </div>
               </div>
               <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowAddDialog(false)}
-                >
+                <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                   Batal
                 </Button>
                 <Button onClick={handleCreate}>Simpan</Button>
@@ -329,79 +303,60 @@ export const InterruptionDataManagement: React.FC = () => {
         </div>
       </motion.div>
 
-      {/* Filters */}
+      {/* Search & Filter Bar */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
+        className="flex flex-col sm:flex-row gap-3"
       >
-        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-          <CardContent className="p-3 sm:p-4 lg:p-6">
-            <div className="space-y-3 sm:space-y-4">
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Cari nomor layanan, nama, atau kontak..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 text-sm"
-                />
-              </div>
-
-              {/* Filters */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2 lg:gap-3">
-                <Select
-                  value={statusFilter || "all"}
-                  onValueChange={(val) =>
-                    setStatusFilter(val === "all" ? "" : val)
-                  }
-                >
-                  <SelectTrigger className="w-full lg:w-48 text-sm">
-                    <SelectValue placeholder="Semua Status" />
-                  </SelectTrigger>
-                  <SelectContent className="z-50 bg-background">
-                    <SelectItem value="all">Semua Status</SelectItem>
-                    <SelectItem value="Open">Open</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Resolved">Resolved</SelectItem>
-                    <SelectItem value="Closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Button
-                  variant="outline"
-                  onClick={loadReports}
-                  size="sm"
-                  className="text-xs sm:text-sm"
-                >
-                  <Filter className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  Refresh
-                </Button>
-              </div>
-
-              {/* Results info */}
-              <div className="flex items-center justify-between">
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  Total: {total} tiket gangguan
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Input
+            placeholder="Cari nomor layanan, nama, atau kontak..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 bg-card/50 border-border/50"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Select
+            value={statusFilter || "all"}
+            onValueChange={(val) => setStatusFilter(val === "all" ? "" : val)}
+          >
+            <SelectTrigger className="w-full sm:w-44 bg-card/50 border-border/50">
+              <SelectValue placeholder="Semua Status" />
+            </SelectTrigger>
+            <SelectContent className="z-50 bg-background">
+              <SelectItem value="all">Semua Status</SelectItem>
+              <SelectItem value="Open">Open</SelectItem>
+              <SelectItem value="In Progress">In Progress</SelectItem>
+              <SelectItem value="Resolved">Resolved</SelectItem>
+              <SelectItem value="Closed">Closed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            onClick={loadReports}
+            size="icon"
+            className="shrink-0"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+        </div>
       </motion.div>
 
       {/* Table */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        transition={{ delay: 0.15 }}
       >
         {loading ? (
-          <Card className="border-border/50 bg-card/50">
+          <Card className="border-border/50">
             <CardContent className="p-12">
               <div className="flex flex-col items-center justify-center gap-3">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div>
                 <p className="text-sm text-muted-foreground">
                   Memuat data gangguan...
                 </p>
@@ -422,26 +377,32 @@ export const InterruptionDataManagement: React.FC = () => {
 
       {/* Pagination */}
       {total > 50 && (
-        <div className="flex justify-center gap-2">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="flex justify-center gap-2"
+        >
           <Button
             variant="outline"
             size="sm"
             disabled={page === 1}
             onClick={() => setPage(page - 1)}
-            className="text-xs sm:text-sm"
           >
             Previous
           </Button>
+          <div className="flex items-center px-3 text-sm text-muted-foreground">
+            Halaman {page} dari {Math.ceil(total / 50)}
+          </div>
           <Button
             variant="outline"
             size="sm"
             disabled={page * 50 >= total}
             onClick={() => setPage(page + 1)}
-            className="text-xs sm:text-sm"
           >
             Next
           </Button>
-        </div>
+        </motion.div>
       )}
     </div>
   );
