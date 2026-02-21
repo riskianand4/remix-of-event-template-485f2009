@@ -16,6 +16,7 @@ import {
 import { usePSBAnalytics } from '@/hooks/usePSBAnalytics';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { motion } from 'framer-motion';
+import { AnimatedCounter } from '@/components/ui/animated-counter';
 
 // ─── Custom Tooltip ───────────────────────────────────────────────────────────
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -59,7 +60,9 @@ const StatCard: React.FC<StatCardProps> = ({
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
-            <p className="text-3xl font-bold text-foreground leading-none">{value}</p>
+            <p className="text-3xl font-bold text-foreground leading-none">
+              {typeof value === 'number' ? <AnimatedCounter value={value} /> : value}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
           </div>
           <div className="p-2.5 rounded-xl bg-background/60 group-hover:scale-110 transition-transform">

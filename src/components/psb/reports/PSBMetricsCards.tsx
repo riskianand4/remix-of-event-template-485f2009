@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Target, CheckCircle, Zap, Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { AnimatedCounter } from '@/components/ui/animated-counter';
 
 interface PSBMetricsCardsProps {
   overallEfficiency: string;
@@ -44,7 +45,9 @@ export const PSBMetricsCards: React.FC<PSBMetricsCardsProps> = ({
               </div>
               <CardContent className="p-4 sm:p-5">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">{card.label}</p>
-                <p className="text-2xl sm:text-3xl font-bold">{values[card.key]}{card.suffix}</p>
+                <p className="text-2xl sm:text-3xl font-bold">
+                  <AnimatedCounter value={parseFloat(values[card.key]) || 0} decimals={card.key === 'signal' ? 1 : 0} suffix={card.suffix} />
+                </p>
                 <div className={`w-8 h-8 ${card.iconBg} rounded-lg flex items-center justify-center mt-2`}>
                   <IconEl className={`w-4 h-4 ${card.iconColor}`} />
                 </div>
