@@ -16,6 +16,7 @@ import {
   CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatedCounter } from '@/components/ui/animated-counter';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
@@ -65,6 +66,7 @@ const StatCardItem: React.FC<StatCardItemProps> = ({
         </div>
         <div className="flex items-end gap-2">
           <div className="text-3xl font-bold text-foreground leading-none">{value}</div>
+          {/* AnimatedCounter applied at usage site */}
           {tag}
         </div>
         {dotClass && (
@@ -257,7 +259,7 @@ export const InterruptionDashboard: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <StatCardItem
           label="Total Tiket"
-          value={analytics.summary.totalReports}
+          value={<AnimatedCounter value={analytics.summary.totalReports} />}
           icon={<Activity className="h-4 w-4 text-foreground/60" />}
           accentClass="border-l-blue-500"
           gradientClass="bg-gradient-to-br from-blue-500/10 to-transparent"
@@ -265,7 +267,7 @@ export const InterruptionDashboard: React.FC = () => {
         />
         <StatCardItem
           label="Tiket Open"
-          value={<span className="text-destructive">{analytics.summary.openReports}</span>}
+          value={<span className="text-destructive"><AnimatedCounter value={analytics.summary.openReports} /></span>}
           icon={<AlertCircle className="h-4 w-4 text-destructive" />}
           accentClass="border-l-destructive"
           gradientClass="bg-gradient-to-br from-destructive/10 to-transparent"
@@ -274,7 +276,7 @@ export const InterruptionDashboard: React.FC = () => {
         />
         <StatCardItem
           label="Resolved"
-          value={<span className="text-primary">{analytics.summary.resolvedReports}</span>}
+          value={<span className="text-primary"><AnimatedCounter value={analytics.summary.resolvedReports} /></span>}
           icon={<CheckCircle2 className="h-4 w-4 text-primary" />}
           accentClass="border-l-primary"
           gradientClass="bg-gradient-to-br from-primary/10 to-transparent"
@@ -284,7 +286,7 @@ export const InterruptionDashboard: React.FC = () => {
           label="Avg Waktu"
           value={
             <span className="text-blue-500">
-              {analytics.summary.averageHandlingTime.toFixed(1)}
+              <AnimatedCounter value={analytics.summary.averageHandlingTime} decimals={1} />
               <span className="text-base font-medium text-muted-foreground ml-1">jam</span>
             </span>
           }
@@ -295,7 +297,7 @@ export const InterruptionDashboard: React.FC = () => {
         />
         <StatCardItem
           label="Performance"
-          value={<span className="text-purple-500">{analytics.summary.performanceRate}%</span>}
+          value={<span className="text-purple-500"><AnimatedCounter value={Number(analytics.summary.performanceRate)} />%</span>}
           icon={<TrendingUp className="h-4 w-4 text-purple-500" />}
           accentClass="border-l-purple-500"
           gradientClass="bg-gradient-to-br from-purple-500/10 to-transparent"
